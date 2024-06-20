@@ -4,20 +4,17 @@
 #
 using ZipFile
 
-function test_status_ok(status)
-    @test typeof(status) == fmi2Status
-    @test status == fmi2StatusOK
-end
 
-function test_status_discard(status)
-    @test typeof(status) == fmi2Status
-    @test status == fmi2StatusDiscard
-end
-
-function getFMU()
-    dlpath = Downloads.download("https://github.com/ThummeTo/FMIZoo.jl/raw/main/models/bin/Dymola/2023x/2.0/BouncingBallGravitySwitch1D.fmu")
+function getFMU(fmuname::String="BouncingBallGravitySwitch1D")
+    if fmuname == "IO"
+        dlurl = "https://github.com/ThummeTo/FMIZoo.jl/raw/main/models/bin/Dymola/2023x/2.0/IO.fmu"
+    else
+        dlurl = "https://github.com/ThummeTo/FMIZoo.jl/raw/main/models/bin/Dymola/2023x/2.0/BouncingBallGravitySwitch1D.fmu"
+        fmuname = "BouncingBallGravitySwitch1D"
+    end
+    dlpath = Downloads.download(dlurl)
     unpackPath = mktempdir(; prefix="fmijl_", cleanup=true)
-    unzippedPath = joinpath(unpackPath, "BouncingBallGravitySwitch1D")
+    unzippedPath = joinpath(unpackPath, fmuname)
     unzippedAbsPath = isabspath(unzippedPath) ? unzippedPath : joinpath(pwd(), unzippedPath)
     numFiles = 0
     if !isdir(unzippedAbsPath)
@@ -48,45 +45,31 @@ function getFMU()
     unzippedAbsPath
 end
 
-function instantiate_args(fmuPath, type::fmi2Type)
-    # TODO get guid and Name from XML
-    guidStr = "{3c564ab6-a92a-48ca-ae7d-591f819b1d93}"
-    callbackFunctions = fmi2CallbackFunctions(C_NULL, C_NULL, C_NULL, C_NULL, C_NULL)
-    # include("build_callbacks.jl")
-    # callbackFunctions = build_callbacks()
-    instanceName = "BouncingBallGravitySwitch1D$(type)"
-    resourcelocation = string("file:///", fmuPath)
-    # resourcelocation = joinpath(resourcelocation, "resources")
-    # resourcelocation = replace(resourcelocation, "\\" => "/")
-    visible = fmi2Boolean(true)
-    loggingon = fmi2Boolean(true)
 
-    # (pointer(instanceName), type, pointer(guidStr), pointer(resourcelocation), Ptr{fmi2CallbackFunctions}(pointer_from_objref(callbackFunctions)), visible, loggingon)
-    [pointer(guidStr), pointer(resourcelocation), Ptr{fmi2CallbackFunctions}(pointer_from_objref(callbackFunctions)), visible, loggingon]
-end
-
-function get_os_binaries()
-    path = getFMU()
+function get_os_binaries(fmuname::String="BouncingBallGravitySwitch1D")
+    path = getFMU(fmuname)
     binarypath = joinpath(path, "binaries")
-    cblibpath = joinpath(pwd(), "FMI2","callbackFunctions")
     if Sys.WORD_SIZE == 64
         if Sys.islinux()
             binarypath = joinpath(binarypath, "linux64")
-            cblibpath = joinpath(cblibpath, "linux64")
+            cblibpath = Downloads.download("https://github.com/ThummeTo/FMIImport.jl/raw/main/src/FMI2/callbackFunctions/binaries/linux64/libcallbackFunctions.so")
             os_supported = true
         elseif Sys.iswindows()
             binarypath = joinpath(binarypath, "win64")
-            cblibpath = joinpath(cblibpath, "win64")
+            cblibpath = Downloads.download("https://github.com/ThummeTo/FMIImport.jl/raw/main/src/FMI2/callbackFunctions/binaries/win64/callbackFunctions.dll")
+            cblibpath = cblibpath * "."
             os_supported = true
         elseif Sys.isapple()
             binarypath = joinpath(binarypath, "darwin64")
-            cblibpath = joinpath(cblibpath, "darwin64")
+            cblibpath = Downloads.download("https://github.com/ThummeTo/FMIImport.jl/raw/main/src/FMI2/callbackFunctions/binaries/darwin64/libcallbackFunctions.dylib")
             os_supported = false # the FMU we are testing with only contains Binaries for win<32,64> and linux64
         else
             os_supported = false
         end
     elseif Sys.iswindows()
         binarypath = joinpath(binarypath, "win32")
+        cblibpath = Downloads.download("https://github.com/ThummeTo/FMIImport.jl/raw/main/src/FMI2/callbackFunctions/binaries/win32/callbackFunctions.dll")
+        cblibpath = cblibpath * "."
         os_supported = true
     else
         os_supported = false
@@ -94,10 +77,15 @@ function get_os_binaries()
     if !os_supported
         @warn "The OS or Architecture used for Testing is not compatible with the FMU used for Testing."
         binarypath = ""
+        cblibpath = ""
     else
-        binarypath = joinpath(binarypath, "BouncingBallGravitySwitch1D")
+        binarypath = joinpath(binarypath, fmuname)
+        perm = filemode(cblibpath)
+        permRWX = 16895
+        if perm != permRWX
+            chmod(cblibpath, permRWX; recursive=true)
+        end
     end
-    cblibpath = joinpath(cblibpath, "libcallbackFunctions")
     (binarypath, path, cblibpath)
 end
 
