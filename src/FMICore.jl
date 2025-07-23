@@ -26,6 +26,7 @@ include("FMI2/ctype.jl")
 include("FMI3/ctype.jl")
 
 include("FMI2/cfunc.jl")
+include("FMI2/generated/functions.jl")
 include("FMI3/cfunc.jl")
 
 include("FMI2/cfunc_unload.jl")
