@@ -6,7 +6,6 @@ Script to extract ccall signatures from FMI2/cfunc.jl
 This script parses the cfunc.jl file and extracts the C function signatures
 from all ccall statements, showing the function name, return type, and parameter types.
 """
-
 using Printf
 using Dates
 
@@ -91,8 +90,7 @@ function extract_function_signature(lines::Vector{SubString{String}}, start_line
     return "unknown", String[]
 end
 
-function extract_parameter_names(signature::String)
-    param_names = String[]
+function extract_parameter_names(signature::String) 
     
     # Find the parameter list between parentheses
     param_match = match(r"\((.*)\)", signature)
